@@ -15,10 +15,7 @@ class RegisterView(APIView):
     permission_classes = []
     throttle_classes = [throttle.VisitThrottle, ]
 
-    def get(self, request):
-        return HttpResponse(request.version)
-
-    def post(self, request):
+    def post(self, request, *args, **kwargs):
         mobile = request.data.get("mobile")
         sms_code = request.data.get("phonecode")
         password = request.data.get("password")
@@ -31,5 +28,5 @@ class RegisterView(APIView):
 
 
 class LoginView(APIView):
-    def post(self, request):
+    def post(self, request, *args, **kwargs):
         pass

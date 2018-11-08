@@ -15,7 +15,7 @@ class VisitThrottle(BaseThrottle):
         ctime = time.time()  # 获取当前时间
         # 如果访问记录中没有请求者的IP，则创建对应的键值对，并允许访问
         if not cache.get(remote_addr):
-            cache.set(remote_addr, ctime)
+            cache.set(remote_addr, [ctime, ])
             return True  # 表示可以访问
         # 如果有对应的访问记录就取出来
         self.history = cache.get(remote_addr)
@@ -25,6 +25,7 @@ class VisitThrottle(BaseThrottle):
         # 查看处理后的记录数量，如果小于3次则允许访问
         if len(self.history) < 3:
             self.history.insert(0, ctime)
+            cache.set(remote_addr, self.history)
             return True
         return False  # 返回False表示访问频率太高，被限制
 

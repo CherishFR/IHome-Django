@@ -1,7 +1,5 @@
-import redis
 from django.core.cache import cache
 from rest_framework import exceptions
-from api import models
 from rest_framework.authentication import BaseAuthentication
 
 
