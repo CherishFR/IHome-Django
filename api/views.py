@@ -1,11 +1,16 @@
 import re
+import logging
+import hashlib
+from api import models
+from ihome_django import settings
 from django.shortcuts import render, HttpResponse
 from api import models
+from django.core.cache import cache
 from django.http import JsonResponse
 from rest_framework.views import APIView
 from rest_framework.versioning import URLPathVersioning
 from api.response_code import RET
-from api.utils import auth, permission, throttle
+from api.utils import auth, permission, throttle, md5
 
 
 # Create your views here.
@@ -26,7 +31,59 @@ class RegisterView(APIView):
         if not re.match(r"^1\d{10}$", mobile):
             return JsonResponse({"errcode": RET.DATAERR, "errmsg": "手机号码格式错误"})
 
+        if len(password) < 6:
+            return JsonResponse({"errcode": RET.DATAERR, "errmsg": "密码长度过短"})
+
+        try:
+            real_sms_code = cache.get("sms_code_%s" % mobile)
+        except Exception as e:
+            logging.error(e)
+            return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库查询出错"})
+
+        if not real_sms_code:
+            return JsonResponse({"errcode": RET.NODATA, "errmsg": "验证码过期"})
+
+        if real_sms_code != sms_code:
+            return JsonResponse({"errcode": RET.DATAERR, "errmsg": "验证码错误"})
+
+        try:
+            cache.delete("sms_code_%s" % mobile)
+        except Exception as e:
+            logging.error(e)
+
+        password = hashlib.sha256(password + settings.SECRET_KEY).hexdigest()
+        try:
+            models.ih_user_profile.objects.create(up_name=mobile, up_mobile=mobile, up_passwd=password)
+        except Exception as e:
+            logging.error(e)
+            return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库查询出错"})
+
+        return JsonResponse({"errcode": RET.OK, "errmsg": "OK"})
+
 
 class LoginView(APIView):
+    authentication_classes = []
+    permission_classes = []
+    throttle_classes = [throttle.VisitThrottle, ]
+
     def post(self, request, *args, **kwargs):
-        pass
+        mobile = request.data.get("mobile")
+        password = request.data.get("password")
+
+        if not all([mobile, password]):
+            return JsonResponse({"errcode": RET.PARAMERR, "errmsg": "参数不完整"})
+
+        if not re.match(r"^1\d{10}$", mobile):
+            return JsonResponse({"errcode": RET.DATAERR, "errmsg": "手机号码格式错误"})
+
+        password = hashlib.sha256(password + settings.SECRET_KEY).hexdigest()
+        try:
+            obj = models.ih_user_profile.objects.filter(up_mobile=models, up_passwd=password).first()
+        except Exception as e:
+            logging.error(e)
+            return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库查询出错"})
+        if not obj:
+            return JsonResponse({"errcode": RET.DATAERR, "errmsg": "用户名密码错误"})
+        user = md5.md5(mobile)
+        request.session["user"] = user
+        return JsonResponse({"errcode": RET.DATAERR, "errmsg": "用户名密码错误"})
