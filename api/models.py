@@ -19,6 +19,14 @@ class ih_user_profile(models.Model):
         verbose_name = ("用户信息表")
 
 
+class ih_user_token(models.Model):
+    up_user = models.OneToOneField(to='ih_user_profile', on_delete=models.CASCADE)
+    up_token = models.CharField(max_length=64)
+
+    class Meta:
+        verbose_name = ("Token表")
+
+
 class ih_area_info(models.Model):
     ai_area_id = models.AutoField("区域ID", null=False, primary_key=True)
     ai_name = models.CharField("区域名称", max_length=32, null=False)

@@ -79,11 +79,13 @@ class LoginView(APIView):
         password = hashlib.sha256(password + settings.SECRET_KEY).hexdigest()
         try:
             obj = models.ih_user_profile.objects.filter(up_mobile=models, up_passwd=password).first()
+            if not obj:
+                return JsonResponse({"errcode": RET.DATAERR, "errmsg": "用户名密码错误"})
+            user_token = md5.md5(mobile)
+            models.ih_user_token.objects.update_or_create(up_user=obj, defaults={'up_token': user_token})
         except Exception as e:
             logging.error(e)
-            return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库查询出错"})
-        if not obj:
-            return JsonResponse({"errcode": RET.DATAERR, "errmsg": "用户名密码错误"})
-        user = md5.md5(mobile)
-        request.session["user"] = user
-        return JsonResponse({"errcode": RET.DATAERR, "errmsg": "用户名密码错误"})
+            return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库操作出错"})
+        response = JsonResponse({"errcode": RET.OK, "errmsg": "OK"})
+        response.set_cookie("token", user_token)
+        return response
