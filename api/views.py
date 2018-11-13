@@ -18,7 +18,6 @@ from api.utils import auth, permission, throttle, md5
 class RegisterView(APIView):
     authentication_classes = []
     permission_classes = []
-    throttle_classes = [throttle.VisitThrottle, ]
 
     def post(self, request, *args, **kwargs):
         mobile = request.data.get("mobile")
@@ -89,3 +88,15 @@ class LoginView(APIView):
         response = JsonResponse({"errcode": RET.OK, "errmsg": "OK"})
         response.set_cookie("token", user_token)
         return response
+
+
+class LogoutView(APIView):
+    permission_classes = []
+
+    def delete(self, request, *args, **kwargs):
+        token = request.COOKIES.get("token")
+        try:
+            models.ih_user_token.objects.filter(token=token).delete()
+        except Exception as e:
+            return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库操作出错"})
+        return JsonResponse({"errcode": RET.OK, "errmsg": "OK"})
