@@ -3,14 +3,14 @@ import logging
 import hashlib
 from api import models
 from ihome_django import settings
-from django.shortcuts import render, HttpResponse
+from django.shortcuts import HttpResponse
 from api import models
 from django.core.cache import cache
 from django.http import JsonResponse
 from rest_framework.views import APIView
-from rest_framework.versioning import URLPathVersioning
 from api.response_code import RET
 from api.utils import auth, permission, throttle, md5
+from api.utils.captcha.captcha import captcha
 
 
 # Create your views here.
@@ -100,3 +100,23 @@ class LogoutView(APIView):
         except Exception as e:
             return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库操作出错"})
         return JsonResponse({"errcode": RET.OK, "errmsg": "OK"})
+
+
+class PicCodeView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request, *args, **kwargs):
+        pre_code_id = request.query_params.get("pre", "")
+        cur_code_id = request.query_params.get("cur")
+        # 生成图片验证码
+        name, text, pic = captcha.generate_captcha()
+        try:
+            if pre_code_id:
+                cache.delete("pic_code_%s" % pre_code_id)
+            cache.set("pic_code_%s" % cur_code_id, text)
+        except Exception as e:
+            logging.error(e)
+            return HttpResponse("查询出错")
+        else:
+            return HttpResponse(pic, content_type='image/png')
