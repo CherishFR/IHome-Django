@@ -82,14 +82,19 @@ DATABASES = {
         'PASSWORD': '123456',
         'HOST': 'localhost',
         'PORT': '3306',
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': 'redis://127.0.0.1:6379',
     }
 }
 
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': '127.0.0.1:6379',
+
+    },
+}
 
 PIC_CODE_EXPIRES_SECONDS = 180  # 图片验证码的有效期，单位秒
-SMS_CODE_EXPIRES_SECONDS = 300  # 图片验证码的有效期，单位秒
+SMS_CODE_EXPIRES_SECONDS = 300  # 短信验证码的有效期，单位秒
 
 SESSION_EXPIRES_SECONDS = 86400  # session数据有效期， 单位秒
 

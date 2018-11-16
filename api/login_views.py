@@ -129,7 +129,7 @@ class PicCodeView(APIView):
         try:
             if pre_code_id:
                 cache.delete("pic_code_%s" % pre_code_id)
-            cache.set("pic_code_%s" % cur_code_id, text)
+            cache.set("pic_code_%s" % cur_code_id, text, settings.PIC_CODE_EXPIRES_SECONDS)
         except Exception as e:
             logging.error(e)
             return HttpResponse("查询出错")
@@ -183,7 +183,7 @@ class SMSCodeView(APIView):
         # 生成短信验证码
         sms_code = "%06d" % random.randint(1, 1000000)
         try:
-            cache.set("sms_code_%s" % mobile, sms_code)
+            cache.set("sms_code_%s" % mobile, sms_code, settings.SMS_CODE_EXPIRES_SECONDS)
         except Exception as e:
             logging.error(e)
             return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库操作出错"})
