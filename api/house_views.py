@@ -55,3 +55,69 @@ class AreaInfoView(APIView):
             logging.error(e)
 
         return JsonResponse({"errcode": RET.OK, "errmsg": "OK", "data": data})
+
+
+class HouseInfoView(APIView):
+    """房屋信息"""
+    def post(self, request, *args, **kwargs):
+        """保存"""
+        user_id = request.user
+        title = request.data.get("title")
+        price = request.data.get("price")
+        area_id = request.data.get("area_id")
+        address = request.data.get("address")
+        room_count = request.data.get("room_count")
+        acreage = request.data.get("acreage")
+        unit = request.data.get("unit")
+        capacity = request.data.get("capacity")
+        beds = request.data.get("beds")
+        deposit = request.data.get("deposit")
+        min_days = request.data.get("min_days")
+        max_days = request.data.get("max_days")
+        facility = request.data.get("facility")
+
+        if not all([title, price, area_id, address, room_count,
+                    acreage, unit, capacity, beds, deposit,
+                    min_days, max_days, facility]):
+            return JsonResponse({"errcode": RET.PARAMERR, "errmsg": "缺少参数"})
+
+        try:
+            price = int(price) * 100
+            deposit = int(deposit) * 100
+        except Exception as e:
+            return JsonResponse({"errcode": RET.DATAERR, "errmsg": "参数错误"})
+
+        try:
+            house_id = models.ih_house_info.objects.create(
+                hi_user_id=user_id,
+                hi_title=title,
+                hi_price=price,
+                hi_area_id=area_id,
+                hi_address=address,
+                hi_room_count=room_count,
+                hi_acreage=acreage,
+                hi_house_unit=unit,
+                hi_capacity=capacity,
+                hi_beds=beds,
+                hi_deposit=deposit,
+                hi_min_days=min_days,
+                hi_max_days=max_days,
+            )
+        except Exception as e:
+            logging.error(e)
+            return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库操作出错"})
+
+        try:
+            for i in range(len(facility)):
+                models.ih_house_facility.objects.create(hf_house_id=house_id,
+                                                        hf_facility_id=facility[i])
+        except Exception as e:
+            logging.error(e)
+            try:
+                models.ih_house_info.objects.delete(hi_house_id=house_id)
+            except Exception as e:
+                logging.error(e)
+                return JsonResponse({"errcode": RET.DBERR, "errmsg": "删除失败"})
+            else:
+                return JsonResponse({"errcode": RET.DBERR, "errmsg": "没有数据保持"})
+        return JsonResponse({"errcode": RET.OK, "errmsg": "OK", "house_id": house_id})
