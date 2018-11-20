@@ -12,7 +12,6 @@ from rest_framework.views import APIView
 from api.response_code import RET
 from api.utils import auth, permission, throttle, md5
 from api.utils.captcha.captcha import captcha
-from api.libs.yuntongxun.SendTemplateSMS import ccp
 
 
 # Create your views here.
@@ -190,7 +189,8 @@ class SMSCodeView(APIView):
 
         # 发送短信
         try:
-            result = ccp.sendTemplateSMS(mobile, [sms_code, settings.SMS_CODE_EXPIRES_SECONDS / 60], 1)
+            # result = ccp.sendTemplateSMS(mobile, [sms_code, settings.SMS_CODE_EXPIRES_SECONDS / 60], 1)
+            result = 111
         except Exception as e:
             logging.error(e)
             return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库操作出错"})

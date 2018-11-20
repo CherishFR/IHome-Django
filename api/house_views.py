@@ -13,7 +13,6 @@ from rest_framework.views import APIView
 from api.response_code import RET
 from api.utils import auth, permission, throttle, md5
 from api.utils.captcha.captcha import captcha
-from api.libs.yuntongxun.SendTemplateSMS import ccp
 
 
 class AreaInfoView(APIView):
@@ -59,6 +58,123 @@ class AreaInfoView(APIView):
 
 class HouseInfoView(APIView):
     """房屋信息"""
+    def get(self, request, *args, **kwargs):
+        """获取房屋信息"""
+        user_id = request.user
+        house_id = request.query_params.get("house_id")
+        if not house_id:
+            return JsonResponse({"errcode": RET.PARAMERR, "errmsg": "缺少参数"})
+
+        # 先尝试从缓存中获取参数
+        try:
+            ret = cache.get("house_info_%s" % house_id)
+        except Exception as e:
+            logging.error(e)
+            ret = None
+        if ret:
+            return JsonResponse({"errcode": RET.OK, "errmsg": "OK", "data": ret, "user_id": user_id})
+
+        # 查询数据库
+        try:
+            house_obj = models.ih_house_info.objects.filter(hi_house_id=house_id).values(
+                'hi_title',
+                'hi_price',
+                'hi_address',
+                'hi_room_count',
+                'hi_acreage',
+                'hi_house_unit',
+                'hi_capacity',
+                'hi_beds',
+                'hi_deposit',
+                'hi_min_days',
+                'hi_max_days',
+                'hi_user_id__up_name',
+                'hi_user_id__up_avatar',
+                'hi_user_id'
+            ).first()
+        except Exception as e:
+            logging.error(e)
+            return JsonResponse({"errcode": RET.DATAERR, "errmsg": "参数错误"})
+        if not house_obj:
+            return JsonResponse({"errcode": RET.NODATA, "errmsg": "查无此房"})
+        data = {
+            "hid": house_id,
+            "user_id": house_obj["hi_user_id"],
+            "title": house_obj["hi_title"],
+            "price": house_obj["hi_price"],
+            "address": house_obj["hi_address"],
+            "room_count": house_obj["hi_room_count"],
+            "acreage": house_obj["hi_acreage"],
+            "unit": house_obj["hi_house_unit"],
+            "capacity": house_obj["hi_capacity"],
+            "beds": house_obj["hi_beds"],
+            "deposit": house_obj["hi_deposit"],
+            "min_days": house_obj["hi_min_days"],
+            "max_days": house_obj["hi_max_days"],
+            "user_name": house_obj["hi_user_id__up_name"],
+            "user_avatar": settings.QINIU_URL_PREFIX + house_obj["up_avatar"]
+            if house_obj.get("hi_user_id__up_avatar") else ""
+        }
+
+        # 查询图片信息
+        try:
+            img_obj = models.ih_house_image.objects.filter(hi_house_id=house_id).values("hi_url")
+        except Exception as e:
+            logging.error(e)
+            img_obj = None
+        images = []
+        if img_obj:
+            for image in img_obj:
+                images.append(settings.QINIU_URL_PREFIX + image["hi_url"])
+        data["images"] = images
+
+        # 查看房屋基础设施
+        try:
+            facility_obj = models.ih_house_facility.objects.filter(hf_house_id=house_id).values("hf_facility_id")
+        except Exception as e:
+            logging.error(e)
+            facility_obj = None
+        facilities =[]
+        if facility_obj:
+            for facility in facility_obj:
+                facilities.append(facility["hf_facility_id"])
+        data["facilities"] = facilities
+
+        # 查看评论信息
+        try:
+            comment_obj = models.ih_order_info.objects.filter(
+                oi_house_id=house_obj,
+                oi_status=4,
+                oi_comment__isnull=False
+            ).values(
+                "oi_comment",
+                "oi_user_id__up_name",
+                "oi_utime",
+                "oi_user_id__up_mobile"
+            )
+        except Exception as e:
+            logging.error(e)
+            comment_obj = None
+        comments = []
+        if comment_obj:
+            for comment in comment_obj:
+                comments.append({
+                    "user_name": comment["oi_user_id__up_name"]
+                    if comment["oi_user_id__up_name"] != comment["oi_user_id__up_mobile"] else "匿名用户",
+                    "content": comment["oi_comment"],
+                    "ctime": comment["oi_utime"].strftime("%Y-%m-%d %H:%M:%S")
+                })
+        data["comments"] = comments
+
+        # 存入到redis中
+        json_data = json.dumps(data)
+        try:
+            cache.set("house_info_%s" % house_id, json_data, settings.REDIS_HOUSE_INFO_EXPIRES_SECONDES)
+        except Exception as e:
+            logging.error(e)
+
+        return JsonResponse({"errcode": RET.OK, "errmsg": "OK", "data": json_data, "user_id": user_id})
+
     def post(self, request, *args, **kwargs):
         """保存"""
         user_id = request.user
