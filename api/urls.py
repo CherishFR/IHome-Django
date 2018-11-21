@@ -9,4 +9,7 @@ urlpatterns = [
     re_path(r'^(?P<version>[v1|v2]+)/smscode/$', login_views.SMSCodeView.as_view()),
     re_path(r'^(?P<version>[v1|v2]+)/house/area/$', house_views.AreaInfoView.as_view()),
     re_path(r'^(?P<version>[v1|v2]+)/house/info/$', house_views.HouseInfoView.as_view()),
+    re_path(r'^(?P<version>[v1|v2]+)/house/image/$', house_views.HouseImageView.as_view()),
+    re_path(r'^(?P<version>[v1|v2]+)/house/my/$', house_views.MyHousesView.as_view()),
+    re_path(r'^(?P<version>[v1|v2]+)/house/index/$', house_views.IndexView.as_view()),
 ]

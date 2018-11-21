@@ -11,6 +11,7 @@ from django.core.cache import cache
 from django.http import JsonResponse
 from rest_framework.views import APIView
 from api.response_code import RET
+from api.utils.qiniu_storage import storage
 from api.utils import auth, permission, throttle, md5
 from api.utils.captcha.captcha import captcha
 
@@ -237,3 +238,117 @@ class HouseInfoView(APIView):
             else:
                 return JsonResponse({"errcode": RET.DBERR, "errmsg": "没有数据保持"})
         return JsonResponse({"errcode": RET.OK, "errmsg": "OK", "house_id": house_id})
+
+
+class HouseImageView(APIView):
+    def post(self, request, *args, **kwargs):
+        house_id = request.query_params.get("house_id")
+        house_image = request.FILES.get("house_image")[0]["body"]
+        # 调用七牛云的storage方法上传图片
+        img_name = storage(house_image)
+        if not img_name:
+            return JsonResponse({"errcode": RET.UNKOWNERR, "errmsg": "qiniu error"})
+        try:
+            models.ih_house_image.objects.create(hi_house_id=house_id, hi_url=img_name)
+            models.ih_house_info.objects.filter(
+                hi_house_id=house_id,
+                hi_index_image_url__isnull=False
+            ).update(hi_index_image_url=house_image)
+        except Exception as e:
+            logging.error(e)
+            return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库操作出错"})
+        img_url = settings.QINIU_URL_PREFIX + img_name
+        return JsonResponse({"errcode": RET.OK, "errmsg": "OK", "url": img_url})
+
+
+class MyHousesView(APIView):
+    def get(self, request, *args, **kwargs):
+        user_id = request.user
+        try:
+            obj = models.ih_house_info.objects.filter(hi_user_id=user_id).values(
+                "hi_house_id",
+                "hi_title",
+                "hi_price",
+                "hi_ctime",
+                "hi_area_id__ai_name",
+                "hi_index_image_url"
+            )
+        except Exception as e:
+            logging.error(e)
+            return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库操作出错"})
+        houses = []
+        if obj:
+            for i in obj:
+                house = {
+                    "house_id": i["hi_house_id"],
+                    "title": i["hi_title"],
+                    "price": i["hi_price"],
+                    "ctime": i["hi_ctime"].strftime("%Y-%m-%d"),
+                    "area_name": i["hi_area_id__ai_name"],
+                    "img_url": settings.QINIU_URL_PREFIX + i["hi_index_image_url"] if i["hi_index_image_url"] else ""
+                }
+                houses.append(house)
+        return JsonResponse({"errcode": RET.OK, "errmsg": "OK", "houses": houses})
+
+
+class IndexView(APIView):
+    def get(self, request, *args, **kwargs):
+        try:
+            ret = cache.get("home_page_data")
+        except Exception as e:
+            logging.error(e)
+            ret = None
+        if ret:
+            json_houses = ret
+        else:
+            try:
+                house_obj = models.ih_house_info.objects.values(
+                    "hi_house_id",
+                    "hi_title",
+                    "hi_order_count",
+                    "hi_index_image_url"
+                ).order_by("-hi_order_count")[:settings.HOME_PAGE_MAX_HOUSES]
+            except Exception as e:
+                logging.error(e)
+                return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库操作出错"})
+            if not house_obj:
+                return JsonResponse({"errcode": RET.NODATA, "errmsg": "没有数据"})
+            houses = []
+            for i in house_obj:
+                if not i["hi_index_image_url"]:
+                    continue
+                house = {
+                    "house_id": i["hi_house_id"],
+                    "title": i["hi_title"],
+                    "img_url": settings.QINIU_URL_PREFIX + i["hi_index_image_url"]
+                }
+                houses.append(house)
+            json_houses = json.dumps(houses)
+            try:
+                cache.set("home_page_data", json_houses, settings.HOME_PAGE_DATA_REDIS_EXPIRE_SECOND)
+            except Exception as e:
+                logging.error(e)
+
+        try:
+            ret = cache.get("area_info")
+        except Exception as e:
+            logging.error(e)
+            ret = None
+        if ret:
+            json_areas = ret
+        else:
+            try:
+                area_obj = models.ih_area_info.objects.values("ai_area_id", "ai_name")
+            except Exception as e:
+                logging.error(e)
+                return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库操作出错"})
+            areas = []
+            if area_obj:
+                for area in area_obj:
+                    areas.append({"area_id": area["ai_area_id"], "name": area["ai_name"]})
+            json_areas = json.dumps(areas)
+            try:
+                cache.set("rea_info", json_areas, settings.REDIS_AREA_INFO_EXPIRES_SECONDES)
+            except Exception as e:
+                logging.error(e)
+        return JsonResponse({"errcode": RET.OK, "errmsg": "OK", "houses": json_houses, "areas": json_areas})
