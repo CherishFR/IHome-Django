@@ -1,12 +1,15 @@
 import re
 import logging
 import json
+import time
+import math
 import hashlib
 import random
 from api import models
 from ihome_django import settings
 from django.shortcuts import HttpResponse
 from api import models
+from django.db.models import Q
 from django.core.cache import cache
 from django.http import JsonResponse
 from rest_framework.views import APIView
@@ -352,3 +355,80 @@ class IndexView(APIView):
             except Exception as e:
                 logging.error(e)
         return JsonResponse({"errcode": RET.OK, "errmsg": "OK", "houses": json_houses, "areas": json_areas})
+
+
+class HouseListView(APIView):
+    """房源列表页面"""
+    def get(self, request, *args, **kwargs):
+        start_data = request.query_params.get("sd", "")
+        end_data = request.query_params.get("ed", "")
+        area_id = request.query_params.get("aid", "")
+        sort_key = request.query_params.get("sk", "new")
+        page = request.query_params.get("p", "1")
+
+        q = Q()
+        if start_data and end_data and time.strptime(start_data, "%Y-%m-%d") and time.strptime(end_data, "%Y-%m-%d"):
+            q.add(Q(oi_end_date__lt=start_data) | Q(oi_begin_date__gt=start_data) |
+                  (Q(oi_end_date__isnull=True) & Q(oi_begin_date__isnull=True)), Q.AND)
+        elif start_data and time.strptime(start_data, "%Y-%m-%d"):
+            q.add(Q(oi_end_date__lt=start_data) |
+                  (Q(oi_end_date__isnull=True) & Q(oi_begin_date__isnull=True)), Q.AND)
+        elif end_data and time.strptime(end_data, "%Y-%m-%d"):
+            q.add(Q(oi_begin_date__gt=start_data) |
+                  (Q(oi_end_date__isnull=True) & Q(oi_begin_date__isnull=True)), Q.AND)
+        if area_id:
+            q.add(Q(hi_area_id=area_id), Q.AND)
+
+        try:
+            count_obj = models.ih_order_info.objects.filter(q).count()
+        except Exception as e:
+            logging.error(e)
+            total_page = -1
+        else:
+            total_page = int(math.ceil(count_obj)/float(settings.HOUSE_LIST_PAGE_CAPACITY))
+            page = int(page)
+            if page > total_page:
+                return JsonResponse({"errcode": RET.OK, "errmsg": "OK", "data": [], "total_page": total_page})
+
+        # 排序
+        order = ""
+        if "new" == sort_key:
+            order = "-oi_house_id__hi_ctime"
+        elif "booking" == sort_key:
+            order = "-oi_house_id__hi_order_count"
+        elif "price-inc" == sort_key:
+            order = "oi_house_id__hi_price"
+        elif "price-des" == sort_key:
+            order = "-oi_house_id__hi_price"
+        try:
+            obj = models.ih_order_info.objects.filter(q).values(
+                "oi_house_id__hi_title",
+                "oi_house_id__hi_house_id",
+                "oi_house_id__hi_price",
+                "oi_house_id__hi_room_count",
+                "oi_house_id__hi_address",
+                "oi_house_id__hi_order_count",
+                "oi_user_id__up_avatar",
+                "oi_house_id__hi_index_image_url",
+                "oi_house_id__hi_ctime"
+            ).order_by(order)[(page-1)*settings.HOUSE_LIST_PAGE_CAPACITY:settings.HOUSE_LIST_PAGE_CAPACITY]
+        except Exception as e:
+            logging.error(e)
+            return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库操作出错"})
+        data = []
+        if obj:
+            for i in obj:
+                house = {
+                    "house_id": i["oi_house_id__hi_house_id"],
+                    "title": i["oi_house_id__hi_title"],
+                    "price": i["oi_house_id__hi_price"],
+                    "room_count": i["oi_house_id__hi_room_count"],
+                    "address": i["oi_house_id__hi_address"],
+                    "order_count": i["oi_house_id__hi_order_count"],
+                    "avatar": settings.QINIU_URL_PREFIX+i["oi_user_id__up_avatar"]
+                    if i.get("oi_user_id__up_avatar") else "",
+                    "image_url":settings.QINIU_URL_PREFIX+i["oi_house_id__hi_index_image_url"]
+                    if i.get("oi_house_id__hi_index_image_url") else "",
+                }
+                data.append(house)
+        return JsonResponse({"errcode": RET.OK, "errmsg": "OK", "data": data, "total_page": total_page})
