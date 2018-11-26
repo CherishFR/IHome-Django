@@ -75,7 +75,7 @@ class NameView(APIView):
         user_id = request.user
         name = request.query_params.get("name")
 
-        if name in (None,""):
+        if name in (None, ""):
             return JsonResponse({"errcode": RET.PARAMERR, "errmsg": "数据错误"})
 
         try:
@@ -85,4 +85,44 @@ class NameView(APIView):
             return JsonResponse({"errcode": RET.DBERR, "errmsg": "用户名已存在"})
 
         request.session["name"] = name
+        return JsonResponse({"errcode": RET.OK, "errmsg": "OK"})
+
+
+class AuthView(APIView):
+    """实名认证"""
+    def get(self, request, *args, **kwargs):
+        user_id = request.user
+
+        try:
+            obj = models.ih_user_profile.objects.filter(up_user_id=user_id).values(
+                "up_real_name",
+                "up_id_card"
+            ).first()
+        except Exception as e:
+            logging.error(e)
+            return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库操作出错"})
+        if not obj:
+            return JsonResponse({"errcode": RET.NODATA, "errmsg": "没有进行认证"})
+        data = {
+            "real_name": obj.get("up_real_name", ""),
+            "id_card": obj.get("up_id_card", ""),
+        }
+        return JsonResponse({"errcode": RET.OK, "errmsg": "OK", "data": data})
+
+    def post(self, request, *args, **kwargs):
+        user_id = request.user
+        real_name = request.query_params.get("real_name")
+        id_card = request.query_params.get("id_card")
+
+        if real_name in (None, "") or id_card in (None, ""):
+            return JsonResponse({"errcode": RET.PARAMERR, "errmsg": "无数据"})
+
+        try:
+            models.ih_user_profile.objects.filter(up_user_id=user_id).update_or_create(
+                up_real_name=real_name,
+                up_id_card=id_card
+            )
+        except Exception as e:
+            logging.error(e)
+            return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库操作出错"})
         return JsonResponse({"errcode": RET.OK, "errmsg": "OK"})
