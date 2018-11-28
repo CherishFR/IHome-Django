@@ -1,5 +1,5 @@
 from django.urls import path, re_path
-from api import login_views, house_views, profile_views
+from api import login_views, house_views, profile_views, order_views
 
 urlpatterns = [
     re_path(r'^(?P<version>[v1|v2]+)/login/$', login_views.LoginView.as_view()),
@@ -17,4 +17,5 @@ urlpatterns = [
     re_path(r'^(?P<version>[v1|v2]+)/profile/$', profile_views.ProfileView.as_view()),
     re_path(r'^(?P<version>[v1|v2]+)/profile/name/$', profile_views.NameView.as_view()),
     re_path(r'^(?P<version>[v1|v2]+)/profile/auth/$', profile_views.AuthView.as_view()),
+    re_path(r'^(?P<version>[v1|v2]+)/order$', order_views.OrderView.as_view()),
 ]

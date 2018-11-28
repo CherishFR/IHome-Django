@@ -73,7 +73,7 @@ class NameView(APIView):
     """用户名"""
     def post(self, request, *args, **kwargs):
         user_id = request.user
-        name = request.query_params.get("name")
+        name = request.data.get("name")
 
         if name in (None, ""):
             return JsonResponse({"errcode": RET.PARAMERR, "errmsg": "数据错误"})
@@ -111,8 +111,8 @@ class AuthView(APIView):
 
     def post(self, request, *args, **kwargs):
         user_id = request.user
-        real_name = request.query_params.get("real_name")
-        id_card = request.query_params.get("id_card")
+        real_name = request.data.get("real_name")
+        id_card = request.data.get("id_card")
 
         if real_name in (None, "") or id_card in (None, ""):
             return JsonResponse({"errcode": RET.PARAMERR, "errmsg": "无数据"})
