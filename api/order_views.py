@@ -89,3 +89,41 @@ class OrderView(APIView):
             logging.error(e)
             return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库操作出错"})
         return JsonResponse({"errcode": RET.OK, "errmsg": "OK"})
+
+
+class MyOrderView(APIView):
+    """我的订单"""
+    def get(self, request, *args, **kwargs):
+        user_id = request.user
+        role = request.query_params.get("role", "")
+
+        try:
+            if role == "landlord":
+                obj = models.ih_order_info.objects.filter(oi_house_id__hi_user_id=user_id).values(
+                    "oi_order_id",
+                    "oi_house_id__hi_title",
+                    "oi_house_id__hi_index_image_url",
+                    "oi_begin_date",
+                    "oi_end_date",
+                    "oi_ctime",
+                    "oi_days",
+                    "oi_amount",
+                    "oi_status",
+                    "oi_comment"
+                ).order_by("-oi_ctime")
+            else:
+                obj = models.ih_order_info.objects.filter(oi_user_id=user_id).values(
+                    "oi_order_id",
+                    "oi_house_id__hi_title",
+                    "oi_house_id__hi_index_image_url",
+                    "oi_begin_date",
+                    "oi_end_date",
+                    "oi_ctime",
+                    "oi_days",
+                    "oi_amount",
+                    "oi_status",
+                    "oi_comment"
+                ).order_by("-oi_ctime")
+        except Exception as e:
+            logging.error(e)
+            return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库操作出错"})
