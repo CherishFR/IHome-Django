@@ -127,3 +127,21 @@ class MyOrderView(APIView):
         except Exception as e:
             logging.error(e)
             return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库操作出错"})
+        orders = []
+        if obj:
+            for i in obj:
+                order = {
+                    "order_id": i["oi_order_id"],
+                    "title": i["oi_house_id__hi_title"],
+                    "img_url": settings.QINIU_URL_PREFIX + i["oi_house_id__hi_index_image_url"]
+                    if i["oi_house_id__hi_index_image_url"] else "",
+                    "start_date": i["oi_begin_date"].strftime("%Y-%m-%d"),
+                    "end_date": i["oi_end_date"].strftime("%Y-%m-%d"),
+                    "ctime": i["oi_ctime"].strftime("%Y-%m-%d"),
+                    "days": i["oi_days"],
+                    "amount": i["oi_amount"],
+                    "status": i["oi_status"],
+                    "comment": i["oi_comment"] if i["oi_comment"] else ""
+                }
+                orders.append(order)
+        return JsonResponse({"errcode": RET.OK, "errmsg": "OK", "orders": orders})
