@@ -19,4 +19,5 @@ urlpatterns = [
     re_path(r'^(?P<version>[v1|v2]+)/profile/auth/$', profile_views.AuthView.as_view()),
     re_path(r'^(?P<version>[v1|v2]+)/order$', order_views.OrderView.as_view()),
     re_path(r'^(?P<version>[v1|v2]+)/order/my$', order_views.MyOrderView.as_view()),
+    re_path(r'^(?P<version>[v1|v2]+)/order/accept$', order_views.AcceptOrderView.as_view()),
 ]

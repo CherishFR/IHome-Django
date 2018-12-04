@@ -145,3 +145,24 @@ class MyOrderView(APIView):
                 }
                 orders.append(order)
         return JsonResponse({"errcode": RET.OK, "errmsg": "OK", "orders": orders})
+
+
+class AcceptOrderView(APIView):
+    """接单"""
+    def post(self, request, *args, **kwargs):
+        order_id = request.data.get("order_id")
+        user_id = request.user
+
+        if not order_id:
+            return JsonResponse({"errcode": RET.PARAMERR, "errmsg": "缺少必要参数"})
+
+        try:
+            models.ih_order_info.objects.filter(
+                oi_order_id=order_id,
+                oi_status=0,
+                oi_house_id__hi_user_id=user_id
+            ).update(oi_status=3)
+        except Exception as e:
+            logging.error(e)
+            return JsonResponse({"errcode": RET.DBERR, "errmsg": "数据库操作出错"})
+        return JsonResponse({"errcode": RET.OK, "errmsg": "OK"})
